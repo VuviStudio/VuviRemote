@@ -63,8 +63,8 @@ node server.js
 {
   "express": "^4.18.2",
   "ws": "^8.13.0",
-  "screenshot-desktop": "^1.15.0",
-  "@nut-tree-fork/nut-js": "^3.1.1"
+  "screenshot-desktop": "^1.12.7",
+  "@nut-tree-fork/nut-js": "^4.2.6"
 }
 ```
 
