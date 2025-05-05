@@ -12,7 +12,7 @@ A high-performance remote desktop control solution built with Node.js and WebSoc
 - Full keyboard input support
 - Precise mouse control
 - Auto-reconnect system
-- Audio streaming capability
+- Audio streaming capability (bugged)
 - Mobile-friendly interface
 - Fullscreen mode
 - Special arrow key controls:
@@ -23,6 +23,7 @@ A high-performance remote desktop control solution built with Node.js and WebSoc
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v14 or higher)
+- [FFmpeg](https://ffmpeg.org/download.html) for audio streaming
 - Windows OS
 
 ## Quick Start
@@ -38,12 +39,18 @@ cd VuviRemote
 npm install
 ```
 
-3. Start the server:
+3. Set up FFmpeg:
+   - Download [FFmpeg](https://ffmpeg.org/download.html)
+   - Create `ffmpeg` folder in project root
+   - Extract FFmpeg files to: `ffmpeg/ffmpeg-master-latest-win64-gpl/`
+   - Verify path: `ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe`
+
+4. Start the server:
 ```bash
 node server.js
 ```
 
-4. Access:
+5. Access:
    - Local: http://localhost:3000
    - Remote access:
      ```bash
@@ -80,6 +87,11 @@ node server.js
 - Check antivirus settings
 - Verify screen capture permissions
 
+### Audio Problems
+- Run `ffmpeg -list_devices true -f dshow -i dummy` to list available devices
+- Update audio device name in server.js
+- Check browser audio permissions
+
 ### Input Control Issues
 - Run as administrator
 - Check for conflicting software
@@ -101,9 +113,11 @@ node server.js
 4. Push to branch
 5. Open pull request
 
-## License
+## License & Copyright
 
-[MIT License](https://github.com/VuviStudio/VuviRemote/blob/main/LICENSE)
+Copyright (c) 2024 VuviStudio. All rights reserved.
+
+This project is licensed under strict copyright terms. See the [LICENSE](LICENSE) file for details.
 
 ## Credits
 
