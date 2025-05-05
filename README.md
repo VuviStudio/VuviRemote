@@ -23,7 +23,6 @@ A high-performance remote desktop control solution built with Node.js and WebSoc
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v14 or higher)
-- [FFmpeg](https://ffmpeg.org/download.html) for audio streaming
 - Windows OS
 
 ## Quick Start
@@ -39,18 +38,12 @@ cd VuviRemote
 npm install
 ```
 
-3. Set up FFmpeg:
-   - Download [FFmpeg](https://ffmpeg.org/download.html)
-   - Create `ffmpeg` folder in project root
-   - Extract FFmpeg files to: `ffmpeg/ffmpeg-master-latest-win64-gpl/`
-   - Verify path: `ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe`
-
-4. Start the server:
+3. Start the server:
 ```bash
 node server.js
 ```
 
-5. Access:
+4. Access:
    - Local: http://localhost:3000
    - Remote access:
      ```bash
@@ -66,20 +59,6 @@ node server.js
   "screenshot-desktop": "^1.15.0",
   "@nut-tree-fork/nut-js": "^3.1.1"
 }
-```
-
-## Configuration
-
-### Port Configuration
-Default port is 3000. Change by setting PORT environment variable:
-```bash
-set PORT=8080 && node server.js
-```
-
-### Audio Device
-Modify audio device name in `server.js`:
-```javascript
-'-i', 'audio=YOUR_AUDIO_DEVICE_NAME',
 ```
 
 ## Security Notes
@@ -100,11 +79,6 @@ Modify audio device name in `server.js`:
 - Run as administrator
 - Check antivirus settings
 - Verify screen capture permissions
-
-### Audio Problems
-- Run `ffmpeg -list_devices true -f dshow -i dummy` to list available devices
-- Update audio device name in server.js
-- Check browser audio permissions
 
 ### Input Control Issues
 - Run as administrator
