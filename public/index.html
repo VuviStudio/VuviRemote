@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rdc</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        #container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+        }
+        #vm-screen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 100vw;
+            max-height: 100vh;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            cursor: none;
+        }
+        #cursor {
+            position: fixed;
+            width: 16px;
+            height: 16px;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+            transition: transform 0.05s ease;
+        }
+        #cursor::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        #cursor::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 4px;
+            background: white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 3px rgba(0,0,0,0.5);
+        }
+        #cursor.clicking::before {
+            background: rgba(255,255,255,0.3);
+        }
+        #status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+            z-index: 1001;
+            font-size: 14px;
+            transition: opacity 0.3s;
+        }
+        #status.fade {
+            opacity: 0;
+        }
+        #fullscreen-btn {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1001;
+            transition: background 0.3s;
+        }
+        #fullscreen-btn:hover {
+            background: rgba(0, 0, 0, 0.9);
+        }
+        #identifier {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            padding: 10px 15px;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 1001;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            display: none;
+        }
+        #identifier::before {
+            content: '⚡';
+            font-size: 18px;
+        }
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #2ecc71;
+            margin-left: 8px;
+            box-shadow: 0 0 5px #2ecc71;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="status">Connecting...</div>
+    <div id="container">
+        <div id="cursor"></div>
+        <canvas id="vm-screen"></canvas>
+    </div>
+    <button id="fullscreen-btn">⛶ Fullscreen</button>
+    <script>
+        const canvas = document.getElementById('vm-screen');
+        const ctx = canvas.getContext('2d');
+        const status = document.getElementById('status');
+        const cursor = document.getElementById('cursor');
+        const container = document.getElementById('container');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const identifier = document.getElementById('identifier');
+        
+        let ws = null;
+        let isFullscreen = false;
+        let audioContext = null;
+        let reconnectInterval = 5000;
+        let reconnectTimeout = null;
+        let lastReconnectAttempt = 0;
+        const RECONNECT_COOLDOWN = 120000;
+        const MAX_RECONNECT_INTERVAL = 60000;
+
+        function connectWebSocket() {
+            if (Date.now() - lastReconnectAttempt < reconnectInterval) return;
+            lastReconnectAttempt = Date.now();
+
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = protocol + '//' + window.location.host;
+            
+            if (ws) {
+                ws.close();
+            }
+
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = () => {
+                status.textContent = 'Connected';
+                status.style.backgroundColor = 'rgba(0, 255, 0, 0.7)';
+                fadeStatus();
+                clearTimeout(reconnectTimeout);
+                reconnectInterval = 5000;
+                
+                setTimeout(() => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                        connectWebSocket();
+                    }
+                }, RECONNECT_COOLDOWN);
+            };
+
+            ws.onclose = () => {
+                status.classList.remove('fade');
+                status.textContent = 'Disconnected - Reconnecting...';
+                status.style.backgroundColor = 'rgba(255, 0, 0, 0.7)';
+                reconnectInterval = Math.min(reconnectInterval * 1.5, MAX_RECONNECT_INTERVAL);
+                reconnectTimeout = setTimeout(connectWebSocket, reconnectInterval);
+            };
+
+            ws.onerror = () => {
+                reconnectInterval = Math.min(reconnectInterval * 2, MAX_RECONNECT_INTERVAL);
+            };
+
+            ws.onmessage = async (event) => {
+                if (event.data instanceof Blob) {
+                    try {
+                        const blob = event.data;
+                        const img = new Image();
+                        img.src = URL.createObjectURL(blob);
+                        await img.decode();
+                        
+                        const containerAspect = container.clientWidth / container.clientHeight;
+                        const imageAspect = img.width / img.height;
+                        
+                        if (containerAspect > imageAspect) {
+                            canvas.height = container.clientHeight;
+                            canvas.width = container.clientHeight * imageAspect;
+                        } else {
+                            canvas.width = container.clientWidth;
+                            canvas.height = container.clientWidth / imageAspect;
+                        }
+                        
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        URL.revokeObjectURL(img.src);
+                    } catch (err) {
+                        console.error('Image processing error:', err);
+                    }
+                } else {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'audio') {
+                            playAudioData(data.data);
+                        }
+                    } catch (err) {
+                        console.error('Message parsing error:', err);
+                    }
+                }
+            };
+        }
+
+        async function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 44100
+                });
+            }
+        }
+
+        async function playAudioData(base64Data) {
+            if (!audioContext) await initAudio();
+            
+            try {
+                const arrayBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0)).buffer;
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                const source = audioContext.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.destination);
+                source.start(0);
+            } catch (err) {
+                console.error('Audio playback error:', err);
+            }
+        }
+
+        const pressedKeys = new Set();
+        let currentMouseX = 0;
+        let currentMouseY = 0;
+        let mouseMovementInterval = null;
+        const MOUSE_MOVE_SPEED = 10; // pixels per movement
+
+        function updateMousePosition(x, y) {
+            currentMouseX = x;
+            currentMouseY = y;
+            cursor.style.transform = `translate(${x}px, ${y}px)`;
+            
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            
+            const scaledX = Math.round((x - rect.left) * scaleX);
+            const scaledY = Math.round((y - rect.top) * scaleY);
+            
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'mousemove',
+                    x: scaledX,
+                    y: scaledY
+                }));
+            }
+        }
+
+        function handleArrowKeys(e, isKeyDown) {
+            const rect = canvas.getBoundingClientRect();
+            
+            if (isKeyDown && !mouseMovementInterval) {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    mouseMovementInterval = setInterval(() => {
+                        const moveAmount = e.key === 'ArrowLeft' ? -MOUSE_MOVE_SPEED : MOUSE_MOVE_SPEED;
+                        currentMouseX = Math.max(rect.left, Math.min(rect.right, currentMouseX + moveAmount));
+                        updateMousePosition(currentMouseX, currentMouseY);
+                    }, 16); // ~60fps
+                } else if (e.key === 'ArrowUp') {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'mousedown',
+                            button: 'right'
+                        }));
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'mousedown',
+                            button: 'left'
+                        }));
+                    }
+                }
+            } else if (!isKeyDown) {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    if (mouseMovementInterval) {
+                        clearInterval(mouseMovementInterval);
+                        mouseMovementInterval = null;
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'mouseup',
+                            button: 'right'
+                        }));
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'mouseup',
+                            button: 'left'
+                        }));
+                    }
+                }
+            }
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const { x, y } = updateMousePosition(e.clientX, e.clientY);
+            cursor.style.display = 'block';
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (!pressedKeys.has(e.key)) {
+                pressedKeys.add(e.key);
+                
+                if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                    e.preventDefault();
+                    handleArrowKeys(e, true);
+                    return;
+                }
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: 'keydown',
+                        key: e.key,
+                        shift: e.shiftKey,
+                        ctrl: e.ctrlKey,
+                        alt: e.altKey,
+                        meta: e.metaKey
+                    }));
+                }
+            }
+            if (e.key === 'Meta' || e.key === 'OS' || e.metaKey || e.ctrlKey || e.key === 'Delete' || 
+                e.key === 'Backspace' || e.key === ' ' || e.key === 'Space') {
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            pressedKeys.delete(e.key);
+            
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                e.preventDefault();
+                handleArrowKeys(e, false);
+                return;
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'keyup',
+                    key: e.key,
+                    shift: e.shiftKey,
+                    ctrl: e.ctrlKey,
+                    alt: e.altKey,
+                    meta: e.metaKey
+                }));
+            }
+            if (e.key === 'Meta' || e.key === 'OS' || e.metaKey || e.ctrlKey || e.key === 'Delete' || 
+                e.key === 'Backspace' || e.key === ' ' || e.key === 'Space') {
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            isFullscreen = !!document.fullscreenElement;
+            fullscreenBtn.textContent = isFullscreen ? '⛶ Exit Fullscreen' : '⛶ Fullscreen';
+            
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        });
+        
+        fullscreenBtn.addEventListener('click', () => {
+            if (!isFullscreen) {
+                document.documentElement.requestFullscreen().catch(console.error);
+            } else {
+                document.exitFullscreen().catch(console.error);
+            }
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'wheel',
+                    deltaX: e.deltaX,
+                    deltaY: e.deltaY,
+                    deltaMode: e.deltaMode
+                }));
+            }
+        });
+
+        window.addEventListener('resize', () => {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        });
+
+        const fadeStatus = () => {
+            setTimeout(() => {
+                status.classList.add('fade');
+            }, 3000);
+        };
+
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            cursor.classList.add('clicking');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'mousedown',
+                    button: e.button === 0 ? 'left' : 'right'
+                }));
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            cursor.classList.remove('clicking');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'mouseup',
+                    button: e.button === 0 ? 'left' : 'right'
+                }));
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            cursor.style.display = 'none';
+        });
+
+        canvas.addEventListener('mouseenter', () => {
+            cursor.style.display = 'block';
+        });
+
+        function attemptAutoFullscreen() {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.log('Auto fullscreen failed:', err);
+            });
+        }
+
+        document.addEventListener('click', attemptAutoFullscreen, { once: true });
+        document.addEventListener('touchstart', attemptAutoFullscreen, { once: true });
+
+        document.addEventListener('click', initAudio, { once: true });
+        connectWebSocket();
+    </script>
+</body>
+</html> 
