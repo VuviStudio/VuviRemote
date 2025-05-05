@@ -2,7 +2,7 @@
 
 A high-performance remote desktop control solution built with Node.js and WebSocket technology. Control your Windows PC through any browser with low-latency screen sharing, keyboard/mouse control, and audio streaming capabilities.
 
-![GitHub](https://img.shields.io/github/license/VuviStudio/VuviRemote)
+![License](https://img.shields.io/badge/license-Copyright%20%C2%A9%202024-blue)
 ![Node](https://img.shields.io/badge/Node.js->=14-green)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 
