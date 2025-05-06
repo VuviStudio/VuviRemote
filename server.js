@@ -253,6 +253,14 @@ wss.on('connection', (ws) => {
                                     break;
                             }
                         }
+
+                        if (modifierKeys.has('control')) {
+                            if (key === 'ArrowUp') {
+                                await mouse.scrollUp(120);
+                            } else if (key === 'ArrowDown') {
+                                await mouse.scrollDown(120);
+                            }
+                        }
                     } catch (err) {
                         console.error('Keyboard down error:', err);
                     }
