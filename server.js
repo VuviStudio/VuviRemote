@@ -5,6 +5,7 @@ const screenshot = require('screenshot-desktop');
 const { mouse, keyboard, Point, Button, Key } = require("@nut-tree-fork/nut-js");
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 
 mouse.config.autoDelayMs = 0;
 keyboard.config.autoDelayMs = 0;
@@ -92,47 +93,67 @@ const keyMap = {
     '9': Key.Num9
 };
 
+function checkFFmpegExists() {
+    const ffmpegPath = 'ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe';
+    return fs.existsSync(ffmpegPath);
+}
+
 function startAudioCapture(ws) {
-    const ffmpeg_list = spawn('ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe', [
-        '-f', 'dshow',
-        '-list_devices', 'true',
-        '-i', 'dummy'
-    ]);
+    if (!checkFFmpegExists()) {
+        console.log('FFmpeg not found - audio capture disabled');
+        return null;
+    }
 
-    ffmpeg_list.stderr.on('data', (data) => {
-        console.log('Available devices:', data.toString());
-    });
-
-    setTimeout(() => {
-        const ffmpeg = spawn('ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe', [
+    try {
+        const ffmpeg_list = spawn('ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe', [
             '-f', 'dshow',
-            '-i', 'audio=YOUR_AUDIO_DEVICE_NAME',
-            '-acodec', 'pcm_s16le',    
-            '-ar', '44100',           
-            '-ac', '2',               
-            '-f', 'wav',               
-            'pipe:1'                  
+            '-list_devices', 'true',
+            '-i', 'dummy'
         ]);
 
-        ffmpeg.on('error', (err) => {
-            console.error('FFmpeg error:', err);
+        ffmpeg_list.stderr.on('data', (data) => {
+            console.log('Available devices:', data.toString());
         });
 
-        ffmpeg.stdout.on('data', (data) => {
-            if (ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    type: 'audio',
-                    data: data.toString('base64')
-                }));
+        setTimeout(() => {
+            try {
+                const ffmpeg = spawn('ffmpeg/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe', [
+                    '-f', 'dshow',
+                    '-i', 'audio=YOUR_AUDIO_DEVICE_NAME',
+                    '-acodec', 'pcm_s16le',    
+                    '-ar', '44100',           
+                    '-ac', '2',               
+                    '-f', 'wav',               
+                    'pipe:1'                  
+                ]);
+
+                ffmpeg.on('error', (err) => {
+                    console.error('FFmpeg error:', err);
+                });
+
+                ffmpeg.stdout.on('data', (data) => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({
+                            type: 'audio',
+                            data: data.toString('base64')
+                        }));
+                    }
+                });
+
+                ffmpeg.stderr.on('data', (data) => {
+                    console.error('FFmpeg:', data.toString());
+                });
+
+                return ffmpeg;
+            } catch (err) {
+                console.error('Failed to start FFmpeg audio capture:', err);
+                return null;
             }
-        });
-
-        ffmpeg.stderr.on('data', (data) => {
-            console.error('FFmpeg:', data.toString());
-        });
-
-        return ffmpeg;
-    }, 1000);
+        }, 1000);
+    } catch (err) {
+        console.error('Failed to list audio devices:', err);
+        return null;
+    }
 }
 
 wss.on('connection', (ws) => {
@@ -157,11 +178,8 @@ wss.on('connection', (ws) => {
         }
     }, 1000/15);
 
-    try {
-        audioProcess = startAudioCapture(ws);
-    } catch (err) {
-        console.error('Failed to start audio capture:', err);
-    }
+    // Try to start audio capture, but don't throw if it fails
+    audioProcess = startAudioCapture(ws);
 
     ws.on('message', async (message) => {
         try {
@@ -324,7 +342,11 @@ wss.on('connection', (ws) => {
         console.log('Client disconnected');
         clearInterval(screenInterval);
         if (audioProcess) {
-            audioProcess.kill();
+            try {
+                audioProcess.kill();
+            } catch (err) {
+                console.error('Error killing audio process:', err);
+            }
         }
         if (mouseState.left) {
             mouse.releaseButton(Button.LEFT).catch(console.error);
