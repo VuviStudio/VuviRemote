@@ -19,6 +19,9 @@ A high-performance remote desktop control solution built with Node.js and WebSoc
   - Left/Right: Move mouse cursor
   - Up: Hold right click
   - Down: Hold left click
+- Custom scrolling controls:
+  - Ctrl + Up Arrow: Scroll up
+  - Ctrl + Down Arrow: Scroll down
 
 ## Prerequisites
 
