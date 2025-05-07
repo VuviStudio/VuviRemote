@@ -6,7 +6,7 @@ A high-performance remote desktop control solution built with Node.js and WebSoc
 - Ultra-low latency screen sharing
 - Multi-monitor support with dynamic, glassy UI
 - Full keyboard and mouse control (including multi-screen cursor)
-- Audio streaming (if FFmpeg is available)
+- Audio streaming (bugged)
 - Modern, elegant, and responsive web interface
 
 ## Installation
