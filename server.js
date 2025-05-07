@@ -3,9 +3,10 @@ const http = require('http');
 const WebSocket = require('ws');
 const screenshot = require('screenshot-desktop');
 const { mouse, keyboard, Point, Button, Key } = require("@nut-tree-fork/nut-js");
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 
 mouse.config.autoDelayMs = 0;
 keyboard.config.autoDelayMs = 0;
@@ -15,6 +16,107 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 app.use(express.static('public'));
+
+const SCREENSHOT_SETTINGS = {
+    quality: 50,        
+    scale: 0.7,         
+    frameRate: 60,      
+    maxFrameTime: 33,   
+    memoryLimit: 100    
+};
+
+let screens = [];
+let activeScreenIndex = 0;
+
+function getWindowsScreens() {
+    try {
+        const psCommand = `
+Add-Type -AssemblyName System.Windows.Forms;
+$monitors = [System.Windows.Forms.Screen]::AllScreens | ForEach-Object {
+    [PSCustomObject]@{
+        DeviceName = $_.DeviceName;
+        X = $_.Bounds.X;
+        Y = $_.Bounds.Y;
+        Width = $_.Bounds.Width;
+        Height = $_.Bounds.Height;
+    }
+};
+$monitors | ConvertTo-Json -Compress
+        `.replace(/\n/g, ' ');
+
+        const output = execSync(`powershell -NoProfile -Command \"${psCommand}\"`, { encoding: 'utf8' });
+        return JSON.parse(output);
+    } catch (err) {
+        console.error('Failed to get screen info from PowerShell:', err);
+        return [];
+    }
+}
+
+async function detectScreens() {
+    try {
+        const displays = await screenshot.listDisplays();
+        const winScreens = getWindowsScreens();
+
+        screens = displays.map((display, index) => {
+            const winScreen = winScreens.find(s => s.DeviceName === display.name || s.DeviceName === display.id);
+            let bounds;
+            if (winScreen) {
+                bounds = {
+                    x: winScreen.X,
+                    y: winScreen.Y,
+                    width: winScreen.Width,
+                    height: winScreen.Height
+                };
+            } else {
+                bounds = display.bounds || { x: 0, y: 0, width: 1920, height: 1080 };
+            }
+            return {
+                id: display.id || index,
+                name: display.name || `Screen ${index + 1}`,
+                bounds,
+                isActive: index === 0
+            };
+        });
+
+        console.log('Detected screens:', screens);
+
+        for (let i = 0; i < screens.length; i++) {
+            try {
+                const filename = `screen${i + 1}.png`;
+                const filepath = path.join(__dirname, 'public', filename);
+                const screen = await screenshot({ screen: screens[i].id });
+                await fs.promises.writeFile(filepath, screen);
+                console.log(`Captured initial screenshot for ${screens[i].name}`);
+            } catch (err) {
+                console.error(`Error capturing initial screenshot for screen ${i}:`, err);
+            }
+        }
+
+        return screens;
+    } catch (err) {
+        console.error('Error detecting screens:', err);
+        screens = [{
+            id: 0,
+            name: 'Screen 1',
+            bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+            isActive: true
+        }];
+        return screens;
+    }
+}
+
+let screenInitPromise = detectScreens();
+
+let frameBuffer = [];
+let lastFrameTime = 0;
+let frameCount = 0;
+let totalDelay = 0;
+
+function cleanupMemory() {
+    if (frameBuffer.length > SCREENSHOT_SETTINGS.memoryLimit) {
+        frameBuffer = frameBuffer.slice(-SCREENSHOT_SETTINGS.memoryLimit);
+    }
+}
 
 const mouseState = {
     left: false,
@@ -156,29 +258,80 @@ function startAudioCapture(ws) {
     }
 }
 
-wss.on('connection', (ws) => {
-    console.log('Client connected');
-    let audioProcess = null;
-    let lastScreenshot = null;
-    let isCapturing = false;
+async function captureScreenPreview(screenIndex) {
+    try {
+        const screenObj = screens[screenIndex];
+        const filename = `screen${screenIndex + 1}.png`;
+        const filepath = path.join(__dirname, 'public', filename);
+        const screen = await screenshot({ screen: screenObj.id });
+        await fs.promises.writeFile(filepath, screen);
+        const preview = await sharp(screen)
+            .resize(320, 180, { fit: 'inside' })
+            .jpeg({ quality: 70 })
+            .toBuffer();
+        return {
+            preview: preview.toString('base64'),
+            filename: filename
+        };
+    } catch (err) {
+        console.error('Error capturing screen preview:', err);
+        return null;
+    }
+}
 
-    const screenInterval = setInterval(async () => {
-        if (isCapturing || ws.readyState !== WebSocket.OPEN) return;
-        
+async function screenshotLoop(ws) {
+    while (ws.readyState === WebSocket.OPEN) {
+        const now = Date.now();
+        let frameStart = now;
         try {
-            isCapturing = true;
-            const screen = await screenshot();
+            const activeScreen = screens[activeScreenIndex];
+            if (!activeScreen || !activeScreen.bounds) {
+                throw new Error('Invalid screen configuration');
+            }
+            const screen = await screenshot({ screen: activeScreen.id });
+            const processedImage = await sharp(screen)
+                .resize(Math.floor(activeScreen.bounds.width * SCREENSHOT_SETTINGS.scale))
+                .jpeg({ quality: SCREENSHOT_SETTINGS.quality })
+                .toBuffer();
             if (ws.readyState === WebSocket.OPEN) {
-                ws.send(screen, { binary: true });
+                ws.send(processedImage, { binary: true });
+                lastFrameTime = now;
+                frameCount++;
+                totalDelay += Date.now() - frameStart;
+                if (frameCount % 30 === 0) {
+                    const avgDelay = totalDelay / 30;
+                    console.log(`Average frame delay: ${avgDelay.toFixed(2)}ms`);
+                    totalDelay = 0;
+                }
             }
         } catch (err) {
             console.error('Screenshot error:', err);
-        } finally {
-            isCapturing = false;
         }
-    }, 1000/15);
+        cleanupMemory();
+        const elapsed = Date.now() - frameStart;
+        const delay = Math.max(0, (1000 / SCREENSHOT_SETTINGS.frameRate) - elapsed);
+        await new Promise(res => setTimeout(res, delay));
+    }
+}
 
-    // Try to start audio capture, but don't throw if it fails
+wss.on('connection', async (ws) => {
+    console.log('Client connected');
+    let audioProcess = null;
+    let isCapturing = false;
+    let clientWidth = 0;
+    let clientHeight = 0;
+
+    await screenInitPromise;
+
+    ws.send(JSON.stringify({
+        type: 'screens',
+        screens: screens,
+        activeScreen: activeScreenIndex
+    }));
+
+    let screenshotActive = true;
+    screenshotLoop(ws);
+
     audioProcess = startAudioCapture(ws);
 
     ws.on('message', async (message) => {
@@ -186,12 +339,24 @@ wss.on('connection', (ws) => {
             const data = JSON.parse(message);
             
             switch(data.type) {
+                case 'dimensions':
+                    clientWidth = data.width;
+                    clientHeight = data.height;
+                    break;
                 case 'mousemove':
                     try {
-                        await mouse.setPosition(new Point(
-                            Math.floor(data.x),
-                            Math.floor(data.y)
-                        ));
+                        const activeScreen = screens[activeScreenIndex];
+                        if (!activeScreen || !activeScreen.bounds) {
+                            throw new Error('Invalid screen configuration');
+                        }
+
+                        const scaleX = activeScreen.bounds.width / clientWidth;
+                        const scaleY = activeScreen.bounds.height / clientHeight;
+                        
+                        const x = Math.floor(data.x * scaleX) + activeScreen.bounds.x;
+                        const y = Math.floor(data.y * scaleY) + activeScreen.bounds.y;
+                        
+                        await mouse.setPosition(new Point(x, y));
                     } catch (err) {
                         console.error('Mouse move error:', err);
                     }
@@ -332,6 +497,48 @@ wss.on('connection', (ws) => {
                         console.error('Keyboard up error:', err);
                     }
                     break;
+                case 'getScreenPreviews':
+                    const previews = [];
+                    const filenames = [];
+                    for (let i = 0; i < screens.length; i++) {
+                        const result = await captureScreenPreview(i);
+                        if (result) {
+                            previews.push(result.preview);
+                            filenames.push(result.filename);
+                        }
+                    }
+                    ws.send(JSON.stringify({
+                        type: 'screenPreviews',
+                        previews: previews,
+                        filenames: filenames
+                    }));
+                    break;
+                case 'switchScreen':
+                    if (data.screenIndex >= 0 && data.screenIndex < screens.length) {
+                        activeScreenIndex = data.screenIndex;
+                        screens.forEach((screen, index) => {
+                            screen.isActive = index === activeScreenIndex;
+                        });
+                        const activeScreen = screens[activeScreenIndex];
+                        if (activeScreen && activeScreen.bounds) {
+                            const centerX = Math.floor(activeScreen.bounds.x + activeScreen.bounds.width / 2);
+                            const centerY = Math.floor(activeScreen.bounds.y + activeScreen.bounds.height / 2);
+                            console.log(`[SWITCH] Moving mouse to screen ${activeScreenIndex}: (${centerX}, ${centerY})`, activeScreen);
+                            mouse.setPosition(new Point(centerX, centerY)).then(() => {
+                                console.log(`[SWITCH] Mouse moved to (${centerX}, ${centerY}) on screen ${activeScreenIndex}`);
+                            }).catch(err => {
+                                console.error('[SWITCH] Mouse move error:', err);
+                            });
+                        } else {
+                            console.warn('[SWITCH] No active screen bounds found for', activeScreenIndex, activeScreen);
+                        }
+                        ws.send(JSON.stringify({
+                            type: 'screens',
+                            screens: screens,
+                            activeScreen: activeScreenIndex
+                        }));
+                    }
+                    break;
             }
         } catch (err) {
             console.error('Input error:', err);
@@ -340,7 +547,7 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         console.log('Client disconnected');
-        clearInterval(screenInterval);
+        screenshotActive = false;
         if (audioProcess) {
             try {
                 audioProcess.kill();
