@@ -35,15 +35,11 @@ A high-performance remote desktop control solution built with Node.js and WebSoc
 ## Remote Access (LocalTunnel)
 To access your server from anywhere, you can use [localtunnel](https://www.npmjs.com/package/localtunnel):
 
-1. Install localtunnel globally (if you haven't):
+1. Start a tunnel (replace `dmain` with your preferred subdomain):
    ```sh
-   npm install -g localtunnel
+   npx localtunnel --port 3000 --subdomain dmain
    ```
-2. Start a tunnel (replace `myvuvi` with your preferred subdomain):
-   ```sh
-   lt --port 3000 --subdomain myvuvi
-   ```
-3. You'll get a public URL like `https://myvuvi.loca.lt` to access your server remotely.
+2. You'll get a public URL like `https://ytcuh.loca.lt` to access your server remotely.
 
 **Note:**
 - LocalTunnel is for quick, temporary remote access. For production, use a VPN or reverse proxy with authentication.
@@ -54,7 +50,6 @@ To access your server from anywhere, you can use [localtunnel](https://www.npmjs
 - [screenshot-desktop](https://www.npmjs.com/package/screenshot-desktop)
 - [sharp](https://www.npmjs.com/package/sharp)
 - [@nut-tree-fork/nut-js](https://www.npmjs.com/package/@nut-tree-fork/nut-js)
-- [systeminformation](https://www.npmjs.com/package/systeminformation)
 
 ## Project Repository
 - GitHub: [https://github.com/VuviStudio/VuviRemote](https://github.com/VuviStudio/VuviRemote)
