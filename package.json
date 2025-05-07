@@ -1,22 +1,24 @@
 {
   "name": "vuvi-remote",
   "version": "1.0.0",
-  "description": "High-performance remote desktop control solution with screen sharing and input control",
+  "description": "A high-performance remote desktop control solution built with Node.js and WebSocket technology. Control your Windows PC through any browser with low-latency screen sharing, keyboard/mouse control, and audio streaming capabilities.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "tunnel": "npx localtunnel --port 3000"
+    "start": "node server.js"
   },
-  "dependencies": {
-    "@nut-tree-fork/nut-js": "^4.2.6",
-    "express": "^4.18.2",
-    "screenshot-desktop": "^1.12.7",
-    "ws": "^8.13.0"
-  },
-  "author": "VuviStudio",
-  "license": "SEE LICENSE IN LICENSE",
   "repository": {
     "type": "git",
     "url": "https://github.com/VuviStudio/VuviRemote"
+  },
+  "author": "VuviStudio",
+  "license": "MIT",
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "express": "^4.18.2",
+    "screenshot-desktop": "^1.15.0",
+    "sharp": "^0.33.2",
+    "systeminformation": "^5.25.11",
+    "ws": "^8.16.0"
   }
 }
+ 
