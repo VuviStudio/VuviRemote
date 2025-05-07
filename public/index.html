@@ -35,38 +35,41 @@
         }
         #cursor {
             position: fixed;
-            width: 16px;
-            height: 16px;
+            width: 26px;
+            height: 26px;
             pointer-events: none;
             z-index: 1000;
             display: none;
-            transition: transform 0.05s ease;
+            transition: transform 0.05s cubic-bezier(.4,2,.6,1);
         }
-        #cursor::before {
-            content: '';
+        #cursor-arrow {
             position: absolute;
-            top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            border: 2px solid white;
-            border-radius: 50%;
-            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            top: 0;
+            width: 26px;
+            height: 26px;
+            pointer-events: none;
+            z-index: 1001;
         }
-        #cursor::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 4px;
-            height: 4px;
-            background: white;
-            border-radius: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 0 3px rgba(0,0,0,0.5);
+        #cursor-arrow svg {
+            width: 26px;
+            height: 26px;
+            filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55));
+            display: block;
         }
-        #cursor.clicking::before {
-            background: rgba(255,255,255,0.3);
+        #cursor-arrow svg polygon {
+            fill: #fff;
+            stroke: #222;
+            stroke-width: 1.5;
+        }
+        #cursor-arrow svg path {
+            stroke: #222;
+            stroke-width: 1.2;
+            fill: none;
+        }
+        #cursor.clicking #cursor-arrow svg polygon {
+            fill: #222;
+            stroke: #fff;
         }
         #status {
             position: fixed;
@@ -133,15 +136,175 @@
             50% { transform: scale(1.2); opacity: 0.8; }
             100% { transform: scale(1); opacity: 1; }
         }
+        #screen-switcher {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            padding: 14px 28px;
+            background: rgba(30, 30, 30, 0.55);
+            border: 1.5px solid rgba(255,255,255,0.08);
+            color: #f5f5f5;
+            border-radius: 16px;
+            cursor: pointer;
+            z-index: 1001;
+            transition: background 0.25s, box-shadow 0.25s, border 0.25s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            box-shadow: 0 4px 32px 0 rgba(0,0,0,0.10);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+        #screen-switcher:hover {
+            background: rgba(40, 40, 40, 0.75);
+            border: 1.5px solid rgba(255,255,255,0.16);
+            box-shadow: 0 8px 32px 0 rgba(0,0,0,0.18);
+        }
+        #screen-switcher::before {
+            content: '🖥️';
+            font-size: 20px;
+        }
+        #screen-overview {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(40, 40, 40, 0.38);
+            padding: 18px 8px 18px 8px;
+            border-radius: 24px;
+            z-index: 1002;
+            display: none;
+            gap: 32px;
+            max-width: 96vw;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 8px 48px 0 rgba(0,0,0,0.13);
+            border: 1.5px solid rgba(255,255,255,0.10);
+            backdrop-filter: blur(32px) saturate(1.5);
+            -webkit-backdrop-filter: blur(32px) saturate(1.5);
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .screen-item {
+            background: rgba(255,255,255,0.03);
+            padding: 0;
+            border-radius: 18px;
+            color: #222;
+            cursor: pointer;
+            transition: box-shadow 0.25s, transform 0.25s, border 0.25s, background 0.25s;
+            border: 1.5px solid rgba(255,255,255,0.08);
+            min-width: 320px;
+            max-width: 340px;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 0;
+            box-shadow: 0 2px 16px 0 rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .screen-item:hover {
+            background: rgba(255,255,255,0.07);
+            transform: translateY(-6px) scale(1.025);
+            box-shadow: 0 12px 48px 0 rgba(0,0,0,0.12);
+            border: 1.5px solid rgba(255,255,255,0.16);
+        }
+        .screen-item.active {
+            border: 2px solid rgba(255,255,255,0.18);
+            box-shadow: 0 0 32px 0 rgba(0,0,0,0.10);
+            background: rgba(255,255,255,0.10);
+        }
+        .screen-preview {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background: rgba(30,30,30,0.18);
+            border-top-left-radius: 18px;
+            border-top-right-radius: 18px;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            box-shadow: 0 2px 12px 0 rgba(0,0,0,0.10);
+        }
+        .screen-info {
+            padding: 22px 18px 18px 18px;
+            background: rgba(24,24,24,0.72);
+            border-bottom-left-radius: 18px;
+            border-bottom-right-radius: 18px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            color: #fff;
+        }
+        .screen-item h3 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            color: #fff;
+        }
+        .screen-item p {
+            margin: 0 0 0 0;
+            font-size: 15px;
+            opacity: 0.7;
+            font-weight: 400;
+            color: #fff;
+        }
+        .screen-item .active-badge {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(255,255,255,0.18);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #fff;
+            letter-spacing: 0.04em;
+            border: 1px solid rgba(255,255,255,0.18);
+            box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+        }
+        .screen-loading {
+            width: 100%;
+            height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(30,30,30,0.18);
+            border-top-left-radius: 18px;
+            border-top-right-radius: 18px;
+        }
+        .loader {
+            border: 4px solid rgba(255,255,255,0.12);
+            border-top: 4px solid #f5f5f5;
+            border-radius: 50%;
+            width: 38px;
+            height: 38px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div id="status">Connecting...</div>
     <div id="container">
-        <div id="cursor"></div>
+        <div id="cursor"><div id="cursor-arrow">
+            <svg viewBox="0 0 26 26">
+                <polygon points="2,2 22,12 14,14 18,22 10,16 7,20" />
+                <path d="M2,2 L14,14" />
+            </svg>
+        </div></div>
         <canvas id="vm-screen"></canvas>
     </div>
     <button id="fullscreen-btn">⛶ Fullscreen</button>
+    <button id="screen-switcher">🖥️</button>
+    <div id="screen-overview"></div>
     <script>
         const canvas = document.getElementById('vm-screen');
         const ctx = canvas.getContext('2d');
@@ -150,6 +313,8 @@
         const container = document.getElementById('container');
         const fullscreenBtn = document.getElementById('fullscreen-btn');
         const identifier = document.getElementById('identifier');
+        const screenSwitcher = document.getElementById('screen-switcher');
+        const screenOverview = document.getElementById('screen-overview');
         
         let ws = null;
         let isFullscreen = false;
@@ -159,6 +324,10 @@
         let lastReconnectAttempt = 0;
         const RECONNECT_COOLDOWN = 120000;
         const MAX_RECONNECT_INTERVAL = 60000;
+        let serverWidth = 0;
+        let serverHeight = 0;
+        let screens = [];
+        let activeScreenIndex = 0;
 
         function connectWebSocket() {
             if (Date.now() - lastReconnectAttempt < reconnectInterval) return;
@@ -200,38 +369,62 @@
                 reconnectInterval = Math.min(reconnectInterval * 2, MAX_RECONNECT_INTERVAL);
             };
 
-            ws.onmessage = async (event) => {
+            ws.onmessage = function(event) {
                 if (event.data instanceof Blob) {
-                    try {
-                        const blob = event.data;
-                        const img = new Image();
-                        img.src = URL.createObjectURL(blob);
-                        await img.decode();
+                    const url = URL.createObjectURL(event.data);
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
                         
                         const containerAspect = container.clientWidth / container.clientHeight;
                         const imageAspect = img.width / img.height;
                         
+                        let drawWidth, drawHeight;
+                        
                         if (containerAspect > imageAspect) {
-                            canvas.height = container.clientHeight;
-                            canvas.width = container.clientHeight * imageAspect;
+                            drawHeight = container.clientHeight;
+                            drawWidth = drawHeight * imageAspect;
                         } else {
-                            canvas.width = container.clientWidth;
-                            canvas.height = container.clientWidth / imageAspect;
+                            drawWidth = container.clientWidth;
+                            drawHeight = drawWidth / imageAspect;
                         }
                         
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        URL.revokeObjectURL(img.src);
-                    } catch (err) {
-                        console.error('Image processing error:', err);
-                    }
+                        canvas.width = drawWidth;
+                        canvas.height = drawHeight;
+                        
+                        ctx.drawImage(img, 0, 0, drawWidth, drawHeight);
+                        
+                        URL.revokeObjectURL(url);
+                    };
+                    img.src = url;
                 } else {
                     try {
                         const data = JSON.parse(event.data);
-                        if (data.type === 'audio') {
+                        if (data.type === 'screens') {
+                            screens = data.screens;
+                            activeScreenIndex = data.activeScreen;
+                        } else if (data.type === 'screenPreviews') {
+                            screenOverview.innerHTML = '';
+                            screens.forEach((screen, index) => {
+                                const screenElement = document.createElement('div');
+                                screenElement.className = `screen-item${screen.isActive ? ' active' : ''}`;
+                                const timestamp = new Date().getTime(); 
+                                screenElement.innerHTML = `
+                                    <img class="screen-preview" src="${data.filenames[index]}?t=${timestamp}" alt="${screen.name}">
+                                    <div class="screen-info">
+                                        <h3>${screen.name}</h3>
+                                        <p>${screen.bounds.width}x${screen.bounds.height}</p>
+                                    </div>
+                                    ${screen.isActive ? '<div class="active-badge">Active</div>' : ''}
+                                `;
+                                screenElement.onclick = () => switchScreen(index);
+                                screenOverview.appendChild(screenElement);
+                            });
+                        } else if (data.type === 'audio') {
                             playAudioData(data.data);
                         }
-                    } catch (err) {
-                        console.error('Message parsing error:', err);
+                    } catch (e) {
+                        console.error('Error parsing message:', e);
                     }
                 }
             };
@@ -264,12 +457,12 @@
         let currentMouseX = 0;
         let currentMouseY = 0;
         let mouseMovementInterval = null;
-        const MOUSE_MOVE_SPEED = 10; // pixels per movement
+        const MOUSE_MOVE_SPEED = 10; 
 
         function updateMousePosition(x, y) {
             currentMouseX = x;
             currentMouseY = y;
-            cursor.style.transform = `translate(${x}px, ${y}px)`;
+            cursor.style.transform = `translate(${x - 2}px, ${y - 2}px)`;
             
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -430,6 +623,13 @@
             const rect = canvas.getBoundingClientRect();
             canvas.width = rect.width;
             canvas.height = rect.height;
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'dimensions',
+                    width: window.innerWidth,
+                    height: window.innerHeight
+                }));
+            }
         });
 
         const fadeStatus = () => {
@@ -479,6 +679,53 @@
 
         document.addEventListener('click', initAudio, { once: true });
         connectWebSocket();
+
+        function showScreenOverview() {
+            screenOverview.innerHTML = '';
+            screenOverview.style.display = 'flex';
+            screens.forEach((screen, index) => {
+                const screenElement = document.createElement('div');
+                screenElement.className = `screen-item${screen.isActive ? ' active' : ''}`;
+                screenElement.innerHTML = `
+                    <div class="screen-loading"><div class="loader"></div></div>
+                    <div class="screen-info">
+                        <h3>${screen.name}</h3>
+                        <p>${screen.bounds.width}x${screen.bounds.height}</p>
+                    </div>
+                    ${screen.isActive ? '<div class="active-badge">Active</div>' : ''}
+                `;
+                screenOverview.appendChild(screenElement);
+            });
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'getScreenPreviews'
+                }));
+            }
+        }
+
+        function hideScreenOverview() {
+            screenOverview.style.display = 'none';
+            screenOverview.innerHTML = '';
+        }
+
+        function switchScreen(index) {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'switchScreen',
+                    screenIndex: index
+                }));
+            }
+            hideScreenOverview();
+        }
+
+        screenSwitcher.onclick = showScreenOverview;
+
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.shiftKey && e.key === 'R' && e.altKey) {
+                e.preventDefault();
+                showScreenOverview();
+            }
+        });
     </script>
 </body>
 </html> 
